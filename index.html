@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instruction Cycle Animation</title>
+  <style>
+    body {
+      background: #0d0f1a;
+      color: white;
+      font-family: "Segoe UI", sans-serif;
+      text-align: center;
+    }
+
+    h1 {
+      color: #22d3ee;
+      margin-bottom: 10px;
+    }
+
+    .container {
+      position: relative;
+      width: 1000px;
+      height: 500px;
+      margin: 0 auto;
+      border: 1px dashed #334155;
+    }
+
+    .node {
+      width: 100px;
+      height: 60px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 10px;
+      background: #1e293b;
+      border: 3px solid #334155;
+      color: #e2e8f0;
+      font-weight: bold;
+      font-size: 14px;
+      position: absolute;
+      transition: all 0.4s ease-in-out;
+      box-shadow: 0 0 10px transparent;
+    }
+
+    .active {
+      background: #22d3ee;
+      color: #0f172a;
+      border-color: #67e8f9;
+      transform: scale(1.1);
+      box-shadow: 0 0 15px #22d3ee, 0 0 30px #0891b2;
+    }
+
+    svg line {
+      stroke: #475569;
+      stroke-width: 2;
+      transition: all 0.4s ease-in-out;
+    }
+
+    .line-active {
+      stroke: #22d3ee;
+      stroke-width: 4;
+      filter: drop-shadow(0 0 6px #22d3ee);
+    }
+
+    select, button, input {
+      margin-top: 15px;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(90deg, #22d3ee, #0ea5e9);
+      color: #0f172a;
+      font-weight: bold;
+      font-size: 15px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      transition: transform 0.2s ease-in-out;
+    }
+
+    button:hover, select:hover, input:hover {
+      transform: scale(1.05);
+    }
+
+    #explanation {
+      margin-top: 15px;
+      font-size: 16px;
+      background: rgba(30, 41, 59, 0.8);
+      padding: 15px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      max-width: 750px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Instruction Cycle Animation</h1>
+  
+  <div>
+    <label for="instruction">Choose Instruction: </label>
+    <select id="instruction" onchange="resetAnimation()">
+      <option value="ADD">ADD (R1 = R1 + R2)</option>
+      <option value="SUB">SUB (R1 = R1 - R2)</option>
+      <option value="MUL">MUL (R1 = R1 × R2)</option>
+      <option value="STORE">STORE (R1 → Memory)</option>
+      <option value="FETCH">FETCH (Memory → R1)</option>
+    </select>
+  </div>
+
+  <!-- Input fields -->
+  <div>
+    <label>R1 Value: </label>
+    <input type="number" id="valR1" value="5">
+    <label>R2 Value: </label>
+    <input type="number" id="valR2" value="3">
+  </div>
+
+  <div class="container">
+    <!-- Top row -->
+    <div class="node" id="PC" style="top:40px; left:40px;">PC</div>
+    <div class="node" id="MAR" style="top:40px; left:220px;">MAR</div>
+    <div class="node" id="MDR" style="top:40px; left:400px;">MDR</div>
+    <div class="node" id="IR" style="top:40px; left:580px;">IR</div>
+
+    <!-- Bottom row -->
+    <div class="node" id="R1" style="top:300px; left:40px;">R1</div>
+    <div class="node" id="R2" style="top:300px; left:220px;">R2</div>
+    <div class="node" id="Y" style="top:300px; left:400px;">Y</div>
+    <div class="node" id="ALU" style="top:300px; left:580px;">ALU</div>
+    <div class="node" id="Z" style="top:300px; left:760px;">Z</div>
+
+    <!-- Bus connections -->
+    <svg width="1000" height="500" style="position:absolute; top:0; left:0;">
+      <line id="BUS" x1="40" y1="200" x2="860" y2="200" />
+
+      <line id="PCtap" x1="90" y1="100" x2="90" y2="200" />
+      <line id="MARtap" x1="270" y1="100" x2="270" y2="200" />
+      <line id="MDRtap" x1="450" y1="100" x2="450" y2="200" />
+      <line id="IRtap" x1="630" y1="100" x2="630" y2="200" />
+
+      <line id="R1tap" x1="90" y1="300" x2="90" y2="200" />
+      <line id="R2tap" x1="270" y1="300" x2="270" y2="200" />
+      <line id="Ytap" x1="450" y1="300" x2="450" y2="200" />
+      <line id="ALUtap" x1="630" y1="300" x2="630" y2="200" />
+      <line id="Ztap" x1="810" y1="300" x2="810" y2="200" />
+    </svg>
+  </div>
+  
+  <button onclick="nextStep()">Next Step</button>
+  <div id="explanation">Choose an instruction and click "Next Step".</div>
+
+  <script>
+    const instructionSteps = {
+      ADD: [
+        {active: ["PC","MAR","Z"], lines:["BUS","PCtap","MARtap"], text: "Step 1: PCout → MARin, Read, PC+1 → Zin"},
+        {active: ["Z","PC","Y"], lines:["BUS","Ztap","PCtap","Ytap"], text: "Step 2: Zout → PCin, Yin, WMFC"},
+        {active: ["MDR","IR"], lines:["BUS","MDRtap","IRtap"], text: "Step 3: MDRout → IRin"},
+        {active: ["R1","Y"], lines:["BUS","R1tap","Ytap"], text: "Step 4: R1out → Yin"},
+        {active: ["R2","ALU","Z","Y"], lines:["BUS","R2tap","Ytap","ALUtap","Ztap"], text: "Step 5: R2out + Y → ALU (Add) → Zin"},
+        {active: ["Z","R1"], lines:["BUS","Ztap","R1tap"], text: "Step 6: Zout → R1in (R1 = R1 + R2)"}
+      ],
+
+      SUB: [
+        {active: ["PC","MAR","Z"], lines:["BUS","PCtap","MARtap"], text: "Step 1: PCout → MARin, Read, PC+1 → Zin"},
+        {active: ["Z","PC","Y"], lines:["BUS","Ztap","PCtap","Ytap"], text: "Step 2: Zout → PCin, Yin, WMFC"},
+        {active: ["MDR","IR"], lines:["BUS","MDRtap","IRtap"], text: "Step 3: MDRout → IRin"},
+        {active: ["R1","Y"], lines:["BUS","R1tap","Ytap"], text: "Step 4: R1out → Yin"},
+        {active: ["R2","ALU","Z","Y"], lines:["BUS","R2tap","Ytap","ALUtap","Ztap"], text: "Step 5: R2out, Subtract → Zin"},
+        {active: ["Z","R1"], lines:["BUS","Ztap","R1tap"], text: "Step 6: Zout → R1in (R1 = R1 - R2)"}
+      ],
+
+      MUL: [
+        {active: ["PC","MAR","Z"], lines:["BUS","PCtap","MARtap"], text: "Step 1: PCout → MARin, Read, PC+1 → Zin"},
+        {active: ["Z","PC","Y"], lines:["BUS","Ztap","PCtap","Ytap"], text: "Step 2: Zout → PCin, Yin, WMFC"},
+        {active: ["MDR","IR"], lines:["BUS","MDRtap","IRtap"], text: "Step 3: MDRout → IRin"},
+        {active: ["R1","Y"], lines:["BUS","R1tap","Ytap"], text: "Step 4: R1out → Yin"},
+        {active: ["R2","ALU","Z","Y"], lines:["BUS","R2tap","Ytap","ALUtap","Ztap"], text: "Step 5: R2out × Y → ALU (Mul) → Zin"},
+        {active: ["Z","R1"], lines:["BUS","Ztap","R1tap"], text: "Step 6: Zout → R1in (R1 = R1 × R2)"}
+      ],
+
+      STORE: [
+        {active: ["R1","MAR"], lines:["BUS","R1tap","MARtap"], text: "Step 1: R1out → MARin"},
+        {active: ["R2","MDR"], lines:["BUS","R2tap","MDRtap"], text: "Step 2: R2out → MDRin, Write"},
+        {active: ["MDR"], lines:["MDRtap"], text: "Step 3: MDRoutE, WMFC (Memory Write Complete)"}
+      ],
+
+      FETCH: [
+        {active: ["R2","MAR"], lines:["BUS","R2tap","MARtap"], text: "Step 1: R2out → MARin, Read"},
+        {active: ["MDR"], lines:["MDRtap"], text: "Step 2: MDRinE, WMFC (Wait for memory read)"},
+        {active: ["MDR","R1"], lines:["BUS","MDRtap","R1tap"], text: "Step 3: MDRout → R1in (Word loaded into R1)"}
+      ]
+    };
+
+    let currentStep = -1;
+    let currentInstruction = "ADD";
+    let R1val = 5, R2val = 3;
+
+    function resetAnimation() {
+      currentInstruction = document.getElementById("instruction").value;
+      R1val = parseInt(document.getElementById("valR1").value);
+      R2val = parseInt(document.getElementById("valR2").value);
+      currentStep = -1;
+      document.querySelectorAll(".node").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll("line").forEach(l => l.classList.remove("line-active"));
+      document.getElementById("explanation").innerText = `Instruction set to ${currentInstruction}. Click "Next Step" to begin.`;
+    }
+
+    function nextStep() {
+      const steps = instructionSteps[currentInstruction];
+
+      document.querySelectorAll(".node").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll("line").forEach(l => l.classList.remove("line-active"));
+
+      currentStep++;
+      if (currentStep >= steps.length) {
+        let resultMsg = `${currentInstruction} Instruction Completed ✅`;
+        if (currentInstruction === "ADD") {
+          resultMsg += ` | Result: R1 = ${R1val} + ${R2val} = ${R1val + R2val}`;
+        } else if (currentInstruction === "SUB") {
+          resultMsg += ` | Result: R1 = ${R1val} - ${R2val} = ${R1val - R2val}`;
+        } else if (currentInstruction === "MUL") {
+          resultMsg += ` | Result: R1 = ${R1val} × ${R2val} = ${R1val * R2val}`;
+        } else if (currentInstruction === "STORE") {
+          resultMsg += ` | Value stored: R1 (${R1val}) → Memory`;
+        } else if (currentInstruction === "FETCH") {
+          resultMsg += ` | Value fetched: Memory (${R2val}) → R1`;
+        }
+        document.getElementById("explanation").innerText = resultMsg;
+        currentStep = steps.length - 1;
+        return;
+      }
+
+      steps[currentStep].active.forEach(id => {
+        document.getElementById(id).classList.add("active");
+      });
+
+      steps[currentStep].lines.forEach(l => {
+        document.getElementById(l).classList.add("line-active");
+      });
+
+      document.getElementById("explanation").innerText = steps[currentStep].text;
+    }
+  </script>
+</body>
+</html>
+
+
